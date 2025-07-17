@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import { Platform, Pressable, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import OCRUploader from '../../components/OCRUploader';
+import DocumentScanner from '../../components/DocumentScanner';
 
 export default function UploadScreen() {
   const [activeTab, setActiveTab] = useState('form'); // 'form' or 'ocr'
@@ -83,8 +83,8 @@ export default function UploadScreen() {
     </ScrollView>
   );
 
-  const renderOCRTab = () => (
-    <OCRUploader />
+  const renderScannerTab = () => (
+    <DocumentScanner />
   );
 
   return (
@@ -113,22 +113,22 @@ export default function UploadScreen() {
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'ocr' && styles.activeTab]}
-          onPress={() => setActiveTab('ocr')}
+          style={[styles.tab, activeTab === 'scanner' && styles.activeTab]}
+          onPress={() => setActiveTab('scanner')}
         >
           <Ionicons 
-            name="scan-outline" 
+            name="crop-outline" 
             size={20} 
-            color={activeTab === 'ocr' ? '#35359e' : '#666'} 
+            color={activeTab === 'scanner' ? '#35359e' : '#666'} 
           />
-          <Text style={[styles.tabText, activeTab === 'ocr' && styles.activeTabText]}>
-            OCR Scanner
+          <Text style={[styles.tabText, activeTab === 'scanner' && styles.activeTabText]}>
+            Doc Scanner
           </Text>
         </TouchableOpacity>
       </View>
 
       {/* Content */}
-      {activeTab === 'form' ? renderFormTab() : renderOCRTab()}
+      {activeTab === 'form' ? renderFormTab() : renderScannerTab()}
     </View>
   );
 }

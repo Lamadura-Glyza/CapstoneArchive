@@ -12,12 +12,13 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { ocrService } from '../lib/ocrService';
+import { documentService } from '../lib/documentService';
 import { supabase } from '../lib/supabase';
 
-export default function OCRUploader() {
+export default function DocumentScanner() {
   const [selectedImage, setSelectedImage] = useState(null);
-  const [extractedText, setExtractedText] = useState('');
+  const [processedImage, setProcessedImage] = useState(null);
+  const [originalWithDetection, setOriginalWithDetection] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [status, setStatus] = useState('idle'); // 'idle', 'loading', 'success', 'error'
@@ -30,7 +31,7 @@ export default function OCRUploader() {
 
   const checkConnection = async () => {
     try {
-      const connected = await ocrService.testConnection();
+      const connected = await documentService.testConnection();
       setIsConnected(connected);
     } catch (error) {
       console.error('Connection check failed:', error);
@@ -67,7 +68,8 @@ export default function OCRUploader() {
 
       if (!result.canceled && result.assets[0]) {
         setSelectedImage(result.assets[0]);
-        setExtractedText('');
+        setProcessedImage(null);
+        setOriginalWithDetection(null);
         setStatus('idle');
       }
     } catch (error) {
@@ -97,7 +99,8 @@ export default function OCRUploader() {
 
       if (!result.canceled && result.assets[0]) {
         setSelectedImage(result.assets[0]);
-        setExtractedText('');
+        setProcessedImage(null);
+        setOriginalWithDetection(null);
         setStatus('idle');
       }
     } catch (error) {
@@ -119,8 +122,8 @@ export default function OCRUploader() {
     }
   };
 
-  // Send image to Flask OCR API
-  const processOCR = async () => {
+  // Send image to Flask Document Processing API
+  const processDocument = async () => {
     if (!selectedImage) {
       Alert.alert('No Image', 'Please select an image first.');
       return;
@@ -129,7 +132,7 @@ export default function OCRUploader() {
     if (!isConnected) {
       Alert.alert(
         'Connection Error',
-        'Cannot connect to OCR service. Please check your Flask backend is running and try again.'
+        'Cannot connect to document processing service. Please check your Flask backend is running and try again.'
       );
       return;
     }
@@ -141,21 +144,22 @@ export default function OCRUploader() {
       // Get base64 from selected image
       const base64Image = selectedImage.base64 || await imageToBase64(selectedImage.uri);
       
-      // Use OCR service
-      const data = await ocrService.extractText(base64Image);
+      // Use document service
+      const data = await documentService.processDocument(base64Image);
       
-      if (data.text) {
-        setExtractedText(data.text);
+      if (data.processed_image) {
+        setProcessedImage(`data:image/jpeg;base64,${data.processed_image}`);
+        setOriginalWithDetection(`data:image/jpeg;base64,${data.original_with_detection}`);
         setStatus('success');
       } else {
-        throw new Error('No text extracted from image');
+        throw new Error('No processed image returned');
       }
     } catch (error) {
-      console.error('OCR processing error:', error);
+      console.error('Document processing error:', error);
       setStatus('error');
       Alert.alert(
-        'OCR Error',
-        'Failed to process the image. Please check your Flask backend is running and try again.'
+        'Processing Error',
+        'Failed to process the document. Please check your Flask backend is running and try again.'
       );
     } finally {
       setIsProcessing(false);
@@ -164,8 +168,8 @@ export default function OCRUploader() {
 
   // Save to Supabase
   const saveToSupabase = async () => {
-    if (!extractedText.trim()) {
-      Alert.alert('No Text', 'Please process an image first to extract text.');
+    if (!processedImage) {
+      Alert.alert('No Processed Image', 'Please process a document first.');
       return;
     }
 
@@ -179,36 +183,38 @@ export default function OCRUploader() {
         throw new Error('User not authenticated');
       }
 
-      // Upload image to Supabase Storage (optional - you can skip this if you don't need to store images)
-      let imageUrl = null;
-      if (selectedImage) {
-        const fileName = `scan_${Date.now()}.jpg`;
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('scans')
-          .upload(fileName, selectedImage.base64, {
-            contentType: 'image/jpeg',
-            upsert: false,
-          });
+      // Convert processed image back to base64 for storage
+      const base64Data = processedImage.replace('data:image/jpeg;base64,', '');
 
-        if (uploadError) {
-          console.warn('Image upload failed:', uploadError);
-          // Continue without image URL
-        } else {
-          const { data: urlData } = supabase.storage
-            .from('scans')
-            .getPublicUrl(fileName);
-          imageUrl = urlData.publicUrl;
-        }
+      // Upload processed image to Supabase Storage
+      let imageUrl = null;
+      const fileName = `processed_doc_${Date.now()}.jpg`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('documents')
+        .upload(fileName, base64Data, {
+          contentType: 'image/jpeg',
+          upsert: false,
+        });
+
+      if (uploadError) {
+        console.warn('Image upload failed:', uploadError);
+        // Continue without image URL
+      } else {
+        const { data: urlData } = supabase.storage
+          .from('documents')
+          .getPublicUrl(fileName);
+        imageUrl = urlData.publicUrl;
       }
 
-      // Insert scan data into database
+      // Insert document data into database
       const { data, error } = await supabase
-        .from('scans')
+        .from('processed_documents')
         .insert([
           {
             user_id: user.id,
-            image_url: imageUrl,
-            extracted_text: extractedText,
+            original_image_url: null, // Could store original too if needed
+            processed_image_url: imageUrl,
+            processing_type: 'border_detection_crop',
             created_at: new Date().toISOString(),
           },
         ])
@@ -220,14 +226,15 @@ export default function OCRUploader() {
 
       Alert.alert(
         'Success',
-        'Document scanned and saved successfully!',
+        'Document processed and saved successfully!',
         [
           {
             text: 'OK',
             onPress: () => {
               // Reset form
               setSelectedImage(null);
-              setExtractedText('');
+              setProcessedImage(null);
+              setOriginalWithDetection(null);
               setStatus('idle');
             },
           },
@@ -237,7 +244,7 @@ export default function OCRUploader() {
       console.error('Supabase save error:', error);
       Alert.alert(
         'Save Error',
-        'Failed to save the scan. Please try again.'
+        'Failed to save the processed document. Please try again.'
       );
     } finally {
       setIsLoading(false);
@@ -248,7 +255,7 @@ export default function OCRUploader() {
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Document Scanner</Text>
-        <Text style={styles.subtitle}>Scan capstone documents with OCR</Text>
+        <Text style={styles.subtitle}>Auto-detect borders and crop documents</Text>
       </View>
 
       {/* Connection Status */}
@@ -260,7 +267,7 @@ export default function OCRUploader() {
             color={isConnected ? "#4CAF50" : "#F44336"} 
           />
           <Text style={[styles.connectionText, { color: isConnected ? '#4CAF50' : '#F44336' }]}>
-            {isConnected ? 'Connected to OCR Service' : 'OCR Service Unavailable'}
+            {isConnected ? 'Connected to Processing Service' : 'Processing Service Unavailable'}
           </Text>
         </View>
         {!isConnected && (
@@ -273,7 +280,7 @@ export default function OCRUploader() {
 
       {/* Image Selection */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>1. Select Image</Text>
+        <Text style={styles.sectionTitle}>1. Select Document Image</Text>
         <View style={styles.buttonRow}>
           <TouchableOpacity style={styles.button} onPress={pickImage}>
             <Ionicons name="images-outline" size={24} color="#fff" />
@@ -293,15 +300,15 @@ export default function OCRUploader() {
           <Image source={{ uri: selectedImage.uri }} style={styles.image} />
           <TouchableOpacity
             style={[styles.processButton, isProcessing && styles.disabledButton]}
-            onPress={processOCR}
+            onPress={processDocument}
             disabled={isProcessing}
           >
             {isProcessing ? (
               <ActivityIndicator color="#fff" />
             ) : (
               <>
-                <Ionicons name="scan-outline" size={20} color="#fff" />
-                <Text style={styles.processButtonText}>Process OCR</Text>
+                <Ionicons name="crop-outline" size={20} color="#fff" />
+                <Text style={styles.processButtonText}>Detect & Crop</Text>
               </>
             )}
           </TouchableOpacity>
@@ -314,14 +321,14 @@ export default function OCRUploader() {
           {status === 'loading' && (
             <View style={styles.statusItem}>
               <ActivityIndicator size="small" color="#35359e" />
-              <Text style={styles.statusText}>Processing image...</Text>
+              <Text style={styles.statusText}>Processing document...</Text>
             </View>
           )}
           {status === 'success' && (
             <View style={styles.statusItem}>
               <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
               <Text style={[styles.statusText, { color: '#4CAF50' }]}>
-                Text extracted successfully!
+                Document processed successfully!
               </Text>
             </View>
           )}
@@ -329,20 +336,27 @@ export default function OCRUploader() {
             <View style={styles.statusItem}>
               <Ionicons name="close-circle" size={20} color="#F44336" />
               <Text style={[styles.statusText, { color: '#F44336' }]}>
-                Failed to extract text
+                Failed to process document
               </Text>
             </View>
           )}
         </View>
       )}
 
-      {/* Extracted Text */}
-      {extractedText && (
+      {/* Detection Visualization */}
+      {originalWithDetection && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>2. Extracted Text</Text>
-          <View style={styles.textContainer}>
-            <Text style={styles.extractedText}>{extractedText}</Text>
-          </View>
+          <Text style={styles.sectionTitle}>Border Detection</Text>
+          <Text style={styles.sectionSubtitle}>Green lines show detected document edges</Text>
+          <Image source={{ uri: originalWithDetection }} style={styles.image} />
+        </View>
+      )}
+
+      {/* Processed Image */}
+      {processedImage && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>2. Cropped Document</Text>
+          <Image source={{ uri: processedImage }} style={styles.image} />
           <TouchableOpacity
             style={[styles.saveButton, isLoading && styles.disabledButton]}
             onPress={saveToSupabase}
@@ -353,7 +367,7 @@ export default function OCRUploader() {
             ) : (
               <>
                 <Ionicons name="save-outline" size={20} color="#fff" />
-                <Text style={styles.saveButtonText}>Save to Database</Text>
+                <Text style={styles.saveButtonText}>Save Document</Text>
               </>
             )}
           </TouchableOpacity>
@@ -400,6 +414,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
     marginBottom: 15,
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 10,
   },
   buttonRow: {
     flexDirection: 'row',
@@ -478,19 +497,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
   },
-  textContainer: {
-    backgroundColor: '#f8f9fa',
-    borderWidth: 1,
-    borderColor: '#dee2e6',
-    borderRadius: 8,
-    padding: 15,
-    minHeight: 100,
-  },
-  extractedText: {
-    fontSize: 16,
-    color: '#333',
-    lineHeight: 24,
-  },
   connectionContainer: {
     backgroundColor: '#fff',
     margin: 10,
@@ -529,4 +535,4 @@ const styles = StyleSheet.create({
     color: '#35359e',
     fontWeight: '500',
   },
-}); 
+});
