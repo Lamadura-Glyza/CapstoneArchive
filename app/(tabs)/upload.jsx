@@ -1,10 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import { Platform, Pressable, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import DocumentScanner from '../../components/DocumentScanner';
 
 export default function UploadScreen() {
-  const [activeTab, setActiveTab] = useState('form'); // 'form' or 'ocr'
   const [title, setTitle] = useState('');
   const [abstract, setAbstract] = useState('');
   const [sourceCode, setSourceCode] = useState('');
@@ -18,75 +16,6 @@ export default function UploadScreen() {
     alert('PDF upload not implemented');
   };
 
-  const renderFormTab = () => (
-    <ScrollView contentContainerStyle={[styles.form, { padding: 10, paddingTop: 10 }]}> 
-      {/* Project Title */}
-      <Text style={styles.label}>Project Title</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Enter project title"
-        placeholderTextColor="#888"
-        value={title}
-        onChangeText={setTitle}
-      />
-      {/* Abstract */}
-      <Text style={styles.label}>Abstract</Text>
-      <TextInput
-        style={[styles.input, styles.textarea]}
-        placeholder="Enter project abstract"
-        placeholderTextColor="#888"
-        value={abstract}
-        onChangeText={setAbstract}
-        multiline
-        numberOfLines={4}
-      />
-      {/* Source Code Link */}
-      <Text style={styles.label}>Source Code Link</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="GitHub repository URL"
-        placeholderTextColor="#888"
-        value={sourceCode}
-        onChangeText={setSourceCode}
-      />
-      {/* Video Code Link */}
-      <Text style={styles.label}>Video Code Link</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Youtube video URL"
-        placeholderTextColor="#888"
-        value={videoCode}
-        onChangeText={setVideoCode}
-      />
-      {/* Project PDF */}
-      <Text style={styles.label}>Project PDF</Text>
-      <Pressable style={styles.pdfBox} onPress={handlePdfUpload}>
-        <Text style={styles.pdfText}>Tap to upload your project PDF{Platform.OS === 'web' ? '' : '\n'}
-          <Text style={{ color: '#888', fontSize: 12 }}>
-            {'\n'}Maximum file size: 10MB
-          </Text>
-        </Text>
-      </Pressable>
-      {/* Terms and Conditions */}
-      <View style={styles.checkboxRow}>
-        <TouchableOpacity onPress={() => setAgreed(!agreed)} style={styles.checkbox}>
-          {agreed ? <Ionicons name="checkbox" size={22} color="#35359e" /> : <Ionicons name="square-outline" size={22} color="#35359e" />}
-        </TouchableOpacity>
-        <Text style={styles.checkboxLabel}>
-          I confirm that this project is my original work and I have the right to publish it. I agree to the terms and conditions.
-        </Text>
-      </View>
-      {/* Upload Button */}
-      <TouchableOpacity style={styles.uploadBtn} disabled={!agreed}>
-        <Text style={styles.uploadBtnText}>Upload</Text>
-      </TouchableOpacity>
-    </ScrollView>
-  );
-
-  const renderScannerTab = () => (
-    <DocumentScanner />
-  );
-
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -97,38 +26,69 @@ export default function UploadScreen() {
         <Text style={styles.headerTitle}>Upload Project</Text>
       </View>
 
-      {/* Tab Navigation */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'form' && styles.activeTab]}
-          onPress={() => setActiveTab('form')}
-        >
-          <Ionicons 
-            name="document-text-outline" 
-            size={20} 
-            color={activeTab === 'form' ? '#35359e' : '#666'} 
-          />
-          <Text style={[styles.tabText, activeTab === 'form' && styles.activeTabText]}>
-            Manual Upload
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'scanner' && styles.activeTab]}
-          onPress={() => setActiveTab('scanner')}
-        >
-          <Ionicons 
-            name="crop-outline" 
-            size={20} 
-            color={activeTab === 'scanner' ? '#35359e' : '#666'} 
-          />
-          <Text style={[styles.tabText, activeTab === 'scanner' && styles.activeTabText]}>
-            Doc Scanner
-          </Text>
-        </TouchableOpacity>
-      </View>
-
       {/* Content */}
-      {activeTab === 'form' ? renderFormTab() : renderScannerTab()}
+      <ScrollView contentContainerStyle={[styles.form, { padding: 10, paddingTop: 10 }]}> 
+        {/* Project Title */}
+        <Text style={styles.label}>Project Title</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter project title"
+          placeholderTextColor="#888"
+          value={title}
+          onChangeText={setTitle}
+        />
+        {/* Abstract */}
+        <Text style={styles.label}>Abstract</Text>
+        <TextInput
+          style={[styles.input, styles.textarea]}
+          placeholder="Enter project abstract"
+          placeholderTextColor="#888"
+          value={abstract}
+          onChangeText={setAbstract}
+          multiline
+          numberOfLines={4}
+        />
+        {/* Source Code Link */}
+        <Text style={styles.label}>Source Code Link</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="GitHub repository URL"
+          placeholderTextColor="#888"
+          value={sourceCode}
+          onChangeText={setSourceCode}
+        />
+        {/* Video Code Link */}
+        <Text style={styles.label}>Video Code Link</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Youtube video URL"
+          placeholderTextColor="#888"
+          value={videoCode}
+          onChangeText={setVideoCode}
+        />
+        {/* Project PDF */}
+        <Text style={styles.label}>Project PDF</Text>
+        <Pressable style={styles.pdfBox} onPress={handlePdfUpload}>
+          <Text style={styles.pdfText}>Tap to upload your project PDF{Platform.OS === 'web' ? '' : '\n'}
+            <Text style={{ color: '#888', fontSize: 12 }}>
+              {'\n'}Maximum file size: 10MB
+            </Text>
+          </Text>
+        </Pressable>
+        {/* Terms and Conditions */}
+        <View style={styles.checkboxRow}>
+          <TouchableOpacity onPress={() => setAgreed(!agreed)} style={styles.checkbox}>
+            {agreed ? <Ionicons name="checkbox" size={22} color="#35359e" /> : <Ionicons name="square-outline" size={22} color="#35359e" />}
+          </TouchableOpacity>
+          <Text style={styles.checkboxLabel}>
+            I confirm that this project is my original work and I have the right to publish it. I agree to the terms and conditions.
+          </Text>
+        </View>
+        {/* Upload Button */}
+        <TouchableOpacity style={styles.uploadBtn} disabled={!agreed}>
+          <Text style={styles.uploadBtnText}>Upload</Text>
+        </TouchableOpacity>
+      </ScrollView>
     </View>
   );
 }
@@ -153,35 +113,6 @@ const styles = {
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
-  },
-  tabContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#fff',
-    paddingHorizontal: 10,
-    paddingTop: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  tab: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    marginHorizontal: 5,
-    borderRadius: 8,
-  },
-  activeTab: {
-    backgroundColor: '#f0f0ff',
-  },
-  tabText: {
-    marginLeft: 8,
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666',
-  },
-  activeTabText: {
-    color: '#35359e',
   },
   form: {
     flexGrow: 1,
@@ -252,5 +183,3 @@ const styles = {
     fontWeight: 'bold',
   },
 };
-
- 
